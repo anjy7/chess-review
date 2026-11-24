@@ -39,6 +39,14 @@ The engine setup script installs Stockfish 19 on Windows. For an existing instal
 
 Use **← / →** to step through moves. **Save review** stores the review in your browser and downloads a JSON copy.
 
+## How it works
+
+- **Engine analysis:** Stockfish 19 searches possible continuations and scores positions with its NNUE neural-network evaluator. Analysis uses either a fixed node budget or a time limit per position.
+- **Move accuracy:** Lichess-derived formulas convert evaluations into winning chances, then turn the drop after each move into a 0–100 accuracy score using an exponential curve.
+- **Game accuracy:** Each player's score averages a volatility-weighted mean and a harmonic mean of move accuracies, emphasizing changing positions and costly mistakes.
+- **Move labels:** Winning-chance drops of roughly 5, 10, and 15 percentage points mark inaccuracies, mistakes, and blunders, with separate rules for forced-mate transitions. Other moves are labeled Best when they match the engine's recommendation, or Good otherwise.
+- **Openings:** Board positions are matched against a local opening database to identify names and ECO codes, including transpositions. Recorded opening transitions receive Book labels while retaining their accuracy scores.
+
 ## Development
 
 ```sh
