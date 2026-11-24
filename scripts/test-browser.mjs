@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
 import { checkPieceInteraction } from './test-piece-interaction.mjs';
+import { checkMaterial } from './test-material.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 await mkdir('.scratch',{recursive:true});
@@ -8,7 +9,7 @@ const server=spawn(process.execPath,['--import','tsx','server/index.ts'],{stdio:
 let browser;
 try {
  await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Server startup timeout')),15000);server.once('error',reject);server.once('exit',code=>reject(Error('Server exited '+code)));server.stdout.on('data',chunk=>{if(chunk.toString().includes('http://')){clearTimeout(timer);resolve();}});server.stderr.on('data',x=>process.stderr.write(x));});
- browser=await chromium.launch();await checkPieceInteraction(browser);const page=await browser.newPage({viewport:{width:1280,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ browser=await chromium.launch();await checkPieceInteraction(browser);await checkMaterial(browser);const page=await browser.newPage({viewport:{width:1280,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{window.__soundEvents=0;const Original=window.AudioContext;window.AudioContext=class extends Original{createOscillator(){window.__soundEvents++;return super.createOscillator();}};});
  const settings=async()=>{if(!await page.getByLabel('Analysis mode').isVisible())await page.getByRole('button',{name:'Review settings',exact:true}).click();};
  await page.goto('http://127.0.0.1:8765');

@@ -10,6 +10,7 @@ Review your chess games locally with Stockfish 19. Built with React, TypeScript,
 - Identify openings, ECO codes, and book moves.
 - Navigate with the evaluation graph, keyboard shortcuts, or autoplay.
 - Smooth click-to-move and magnetic drag-and-drop, with touch support.
+- Display captured pieces and the material lead beneath each player's name.
 - Replay recorded game clocks and save reviews locally.
 
 ## Getting started
