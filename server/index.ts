@@ -7,6 +7,7 @@ import { enginePath } from './engine.js';
 import { review } from './review.js';
 import { analyzePosition, positionInput } from './position.js';
 import { analysisOptions } from './analysis-profile.js';
+import { recentGames } from './recent-games.js';
 import { parseGame, importLink } from './game.js';
 import { SCORING_VERSION } from '../src/scoring.js';
 import type { Job } from '../src/types.js';
@@ -27,6 +28,10 @@ app.get('/api/health',(_req,res)=>{try{res.json({available:existsSync(enginePath
 app.post('/api/import',async(req,res,next)=>{
   const controller=new AbortController();res.on('close',()=>controller.abort());
   try{const game=req.body.pgn?parseGame(req.body.pgn):await Effect.runPromise(importLink(String(req.body.url||''),String(req.body.username||'')),{signal:controller.signal});res.json(game);}catch(e){next(e);}
+});
+app.post('/api/recent-games',async(req,res,next)=>{
+  const controller=new AbortController();res.on('close',()=>controller.abort());
+  try{const games=await Effect.runPromise(recentGames(req.body.username),{signal:controller.signal});if(!res.destroyed)res.json({games});}catch(error){if(!res.destroyed)next(error);}
 });
 app.post('/api/position',async(req,res,next)=>{
   let controller:AbortController|undefined;

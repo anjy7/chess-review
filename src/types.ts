@@ -1,3 +1,4 @@
+export type RecentGame={id:string;url:string;pgn:string;white:string;black:string;result:string;endTime:number;timeClass:string};
 export type Opening={eco:string;name:string};
 export type Game = {pgn:string; headers:Record<string,string>; positions:string[]; opening?:Opening; moves:{san:string;uci:string;clockSeconds?:number;book?:boolean;opening?:Opening}[]};
 export type Evaluation = {cp:number;mate:number|null;pv:string[];depth:number;nodes?:number;timeMs?:number};

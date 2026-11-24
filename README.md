@@ -4,7 +4,7 @@ Review your chess games locally with Stockfish 19. Built with React, TypeScript,
 
 ## Features
 
-- Import games from Chess.com links or PGN files.
+- Import games from Chess.com links or PGN files, or pick from a username’s five latest completed games.
 - Review move accuracy, evaluations, and game summaries.
 - Explore Stockfish recommendations and play your own variations with live analysis.
 - Identify openings, ECO codes, and book moves.
@@ -32,7 +32,7 @@ The engine setup script installs Stockfish 19 on Windows. For an existing instal
 
 ## Usage
 
-1. Import a Chess.com game, paste or upload a PGN, or select **Try demo**.
+1. Enter a Chess.com username and click **Find recent games**, then choose a game and **Import selected game**. You can also paste a game link, upload a PGN, or select **Try demo**.
 2. Choose an analysis mode in Settings and click **Analyze game**.
 3. Click **Start Review** to step through your moves.
 4. Select **Play best line** or move pieces on the board to explore variations.

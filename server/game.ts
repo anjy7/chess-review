@@ -20,7 +20,7 @@ export function linkId(link:string) {
   if(url.protocol!=='https:'||!['chess.com','www.chess.com'].includes(url.hostname)||!match)throw new Error('Use a Chess.com completed game/live or game/daily link.');
   return {kind:match[1],id:match[2]};
 }
-const json=(url:string)=>Effect.tryPromise({try:async signal=>{
+export const json=(url:string)=>Effect.tryPromise({try:async signal=>{
   const response=await fetch(url,{signal,headers:{'User-Agent':'LocalChessReview/0.1 (personal analysis)'},redirect:'error'});
   if(!response.ok)throw new Error(`Chess.com returned HTTP ${response.status}`);
   return response.json();
