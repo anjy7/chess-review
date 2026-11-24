@@ -21,7 +21,7 @@ export async function checkRecentGames(browser){
   assert.ok(await page.locator('.player[data-color=b]').innerText().then(s=>s.includes('Opponent2')));
   await page.getByRole('button',{name:'＋ Import game',exact:true}).click();
   await page.getByLabel('Username',{exact:true}).fill('Empty');await page.getByRole('button',{name:'Find recent games',exact:true}).click();
-  await page.getByText('No completed standard games found in the recent archives.',{exact:true}).waitFor();assert.equal(await page.getByLabel('Recent games',{exact:true}).count(),0);
+  await page.locator('.recent-games').getByText('No completed standard games found in the recent archives.',{exact:true}).waitFor();assert.equal(await page.getByLabel('Recent games',{exact:true}).count(),0);
   await page.getByLabel('Username',{exact:true}).fill('Missing');await page.getByRole('button',{name:'Find recent games',exact:true}).click();await page.locator('.recent-games').getByText(/HTTP 404/).waitFor();
   await page.getByLabel('Username',{exact:true}).fill('Slow');
   const pending=page.waitForRequest('**/api/recent-games');await page.getByRole('button',{name:'Find recent games',exact:true}).click();await pending;

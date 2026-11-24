@@ -7,9 +7,11 @@ Review your chess games locally with Stockfish 19. Built with React, TypeScript,
 - Import games from Chess.com links or PGN files, or pick from a username’s five latest completed games.
 - Review move accuracy, evaluations, and game summaries.
 - Explore Stockfish recommendations and play your own variations with live analysis.
+- Open **View decision tree** for a top-down tree with three candidate moves, evaluations, expandable replies, and branch-to-board exploration.
 - Identify openings, ECO codes, and book moves.
 - Navigate with the evaluation graph, keyboard shortcuts, or autoplay.
 - Smooth click-to-move and magnetic drag-and-drop, with touch support.
+- Switch between recent games and saved analyses in two scrollable library lists.
 - Display captured pieces and the material lead beneath each player's name.
 - Replay recorded game clocks and save reviews locally.
 
@@ -38,7 +40,9 @@ The engine setup script installs Stockfish 19 on Windows. For an existing instal
 4. Select **Play best line** or move pieces on the board to explore variations.
 5. Use **Return to game** or **Esc** to return to the review.
 
-Use **← / →** to step through moves. **Save review** stores the review in your browser and downloads a JSON copy.
+**View decision tree** searches the current position with Stockfish MultiPV 3 (one thread, one second per expansion). Expand replies on demand or choose **Show on board** to play a branch. Each candidate shows move accuracy and winning-chance loss relative to the best candidate in that parent search, using the review’s scoring formulas. Move text matches the player making the move; white/black bars show the advantage using the same scale as the main board; the display is a candidate-move tree, not Stockfish’s full internal search tree. Closing the popup cancels its active search.
+
+Use **← / →** to step through moves. **Save review** stores the review in your browser and downloads a JSON copy. All saved reviews appear in the library with the original game ID and played date/time when present in the PGN (UTC is labeled); saving the same game again updates its entry. Click outside the import dialog or press **Esc** to close it.
 
 ## Analysis modes
 
@@ -54,7 +58,7 @@ Every mode uses Stockfish 19 to evaluate positions and find the strongest contin
 
 ### Fixed-node analysis
 
-Lichess-compatible mode limits search work rather than elapsed time. A node is a position visited during the search. It works backward through the game in groups, with warm-up searches and a cleared engine cache between groups. The nominal 1M budget becomes **857,142 nodes per search** after fishnet's overlap adjustment. It uses **one CPU thread and 16 MB of hash memory**; completion time depends on your CPU.
+Lichess-compatible mode limits search work rather than elapsed time. A node is a position visited during the search. It works backward through the game in groups, with warm-up searches and a cleared engine cache between groups. The nominal 1M budget becomes **857,142 nodes per search** after fishnet's overlap adjustment. By default, **16 Stockfish workers** process independent groups in parallel, each using **one CPU thread and 16 MB of hash memory**. Change **Workers** (1–32) in Settings; your choice is remembered in this browser. Short games use fewer workers than requested when there are fewer groups. The per-position budget is unchanged.
 
 ### Timed analysis
 

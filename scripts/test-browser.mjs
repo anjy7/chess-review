@@ -3,6 +3,8 @@ import { chromium } from 'playwright';
 import { checkPieceInteraction } from './test-piece-interaction.mjs';
 import { checkMaterial } from './test-material.mjs';
 import { checkRecentGames } from './test-recent-games.mjs';
+import { checkTree } from './test-tree.mjs';
+import { checkGameLibrary } from './test-game-library.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 await mkdir('.scratch',{recursive:true});
@@ -10,11 +12,12 @@ const server=spawn(process.execPath,['--import','tsx','server/index.ts'],{stdio:
 let browser;
 try {
  await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Server startup timeout')),15000);server.once('error',reject);server.once('exit',code=>reject(Error('Server exited '+code)));server.stdout.on('data',chunk=>{if(chunk.toString().includes('http://')){clearTimeout(timer);resolve();}});server.stderr.on('data',x=>process.stderr.write(x));});
- browser=await chromium.launch();await checkPieceInteraction(browser);await checkMaterial(browser);await checkRecentGames(browser);const page=await browser.newPage({viewport:{width:1280,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ browser=await chromium.launch();await checkPieceInteraction(browser);await checkMaterial(browser);await checkRecentGames(browser);await checkGameLibrary(browser);await checkTree(browser);const page=await browser.newPage({viewport:{width:1280,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{window.__soundEvents=0;const Original=window.AudioContext;window.AudioContext=class extends Original{createOscillator(){window.__soundEvents++;return super.createOscillator();}};});
  const settings=async()=>{if(!await page.getByLabel('Analysis mode').isVisible())await page.getByRole('button',{name:'Review settings',exact:true}).click();};
  await page.goto('http://127.0.0.1:8765');
- assert.equal(await page.getByLabel('Analysis mode').inputValue(),'lichess');
+ assert.equal(await page.getByLabel('Analysis mode').inputValue(),'lichess');assert.equal(await page.getByLabel('Analysis workers').inputValue(),'16');
+ await page.getByRole('button',{name:'Close import',exact:true}).click();await page.getByLabel('Analysis workers').fill('32');await page.reload();assert.equal(await page.getByLabel('Analysis workers').inputValue(),'32');
  await page.getByRole('button',{name:'Try demo',exact:true}).click();
  await page.getByText('Ready to analyze',{exact:true}).waitFor();
  assert.equal(await page.locator('#board button').count(),64);
@@ -182,12 +185,16 @@ try {
  assert.equal(await page.getByLabel('Black clock',{exact:true}).innerText(),'◷ —:—');
  await page.getByRole('button',{name:'First position',exact:true}).click();
  await page.getByLabel('Analysis mode').selectOption('lichess');
- await page.getByRole('button',{name:'Analyze game',exact:true}).click();
+ await page.getByLabel('Analysis workers').fill('33');assert.ok(await page.getByRole('button',{name:'Analyze game',exact:true}).isDisabled());
+ await page.getByLabel('Analysis workers').fill('32');assert.ok(await page.getByRole('button',{name:'Analyze game',exact:true}).isEnabled());
+ await page.getByLabel('Analysis workers').fill('4');assert.equal(await page.evaluate(()=>localStorage.getItem('chess-workers')),'4');
+ await page.getByRole('button',{name:'Analyze game',exact:true}).click();assert.ok(await page.getByLabel('Analysis workers').isDisabled());
  await page.locator('#status').filter({hasText:'done'}).waitFor({state:'attached',timeout:90000});
  assert.equal(await page.locator('#moves small').count(),4);
  await page.getByRole('button',{name:'Save review',exact:true}).click();
  const compatible=await page.evaluate(()=>JSON.parse(localStorage.getItem('chess-reviews'))[0].job);
  assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('chess-reviews'))[0].game.moves.map(m=>m.clockSeconds??null)),[299,298,297,null]);
+ assert.equal(compatible.analysis.workers,4);assert.equal(compatible.analysis.effectiveWorkers,1);
  assert.equal(compatible.analysis.mode,'lichess');assert.equal(compatible.analysis.nodes,857142);assert.equal(compatible.analysis.nominalNodes,1000000);
  assert.equal(compatible.analysis.profile,'fishnet-17d4d063-manual-v1');assert.equal(compatible.analysis.completedPositions,5);
  assert.ok(compatible.results.every(row=>row.after.nodes>=857142));
@@ -196,6 +203,7 @@ try {
  await page.getByRole('button',{name:'Cancel',exact:true}).click();
  await page.locator('#status').filter({hasText:'cancelled'}).waitFor({timeout:10000});
  const invalidPosition=await page.request.post('http://127.0.0.1:8765/api/position',{data:{initialFen:'bad',moves:[]}});assert.equal(invalidPosition.status(),400);
+ for(const workers of [0,33,2.5,'4']){const invalidWorkers=await page.request.post('http://127.0.0.1:8765/api/analyze',{data:{pgn:'1. e4 *',mode:'lichess',workers}});assert.equal(invalidWorkers.status(),400);}
  const invalidMode=await page.request.post('http://127.0.0.1:8765/api/analyze',{data:{pgn:'1. e4 *',mode:'bogus'}});assert.equal(invalidMode.status(),400);
  const denied=await page.request.post('http://127.0.0.1:8765/api/analyze',{headers:{Origin:'https://evil.example'},data:{pgn:'1. e4 *'}});assert.equal(denied.status(),403);
  const invalid=await page.request.post('http://127.0.0.1:8765/api/import',{data:{pgn:'1. e5 *'}});assert.equal(invalid.status(),400);

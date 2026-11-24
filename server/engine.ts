@@ -55,7 +55,26 @@ export class UciEngine {
     });
   }
   newGame(){return this.command('ucinewgame\nisready',line=>line==='readyok');}
-  evaluate(initialFen:string, moves:string[], budget:number|SearchLimit) {
+  private normalize(evaluation:Evaluation,fen:string):Evaluation {
+    if(!this.compatible)return evaluation;
+    const board=new Chess(fen);
+    return {...evaluation,pv:evaluation.pv.map(uci=>{const normal=standardMove(board,uci);board.move(normal);return normal;})};
+  }
+  evaluateVariations(initialFen:string,moves:string[],milliseconds=1000) {
+    return Effect.gen(this,function*(){
+      const board=new Chess(initialFen);for(const move of moves)board.move(move);
+      const count=Math.min(3,board.moves().length);if(!count)return [];
+      const depths=new Map<number,Map<number,Evaluation>>();
+      yield* this.command(`setoption name MultiPV value ${count}\nisready`,line=>line==='readyok');
+      yield* this.evaluate(initialFen,moves,{milliseconds},(rank,evaluation)=>{
+        const entries=depths.get(evaluation.depth)||new Map<number,Evaluation>();entries.set(rank,evaluation);depths.set(evaluation.depth,entries);
+      });
+      // Use the deepest complete iteration, avoiding a mixture of ranks from different depths.
+      const complete=[...depths].filter(([,entries])=>entries.size===count).sort((a,b)=>b[0]-a[0])[0]?.[1];
+      return complete?[...complete].sort((a,b)=>a[0]-b[0]).map(([,evaluation])=>this.normalize(evaluation,board.fen())):[];
+    }).pipe(Effect.ensuring(this.command('setoption name MultiPV value 1\nisready',line=>line==='readyok').pipe(Effect.ignore)));
+  }
+  evaluate(initialFen:string, moves:string[], budget:number|SearchLimit,collect?:(rank:number,evaluation:Evaluation)=>void) {
     return Effect.gen(this,function*(){
       const limit=typeof budget==='number'?{milliseconds:budget}:budget;
       const board=new Chess(initialFen),engineMoves:string[]=[];
@@ -72,11 +91,11 @@ export class UciEngine {
         const score=/\bscore (cp|mate) (-?\d+)/.exec(line);
         if(!score)return;
         const value=Number(score[2]);
-        evaluation={cp:score[1]==='cp'?sign*value:sign*(value>=0?100000:-100000),mate:score[1]==='mate'?sign*value:null,depth:Number(/\bdepth (\d+)/.exec(line)?.[1]||0),pv:line.split(' pv ')[1]?.trim().split(/\s+/)||[]};
+        const candidate:Evaluation={cp:score[1]==='cp'?sign*value:sign*(value>=0?100000:-100000),mate:score[1]==='mate'?sign*value:null,depth:Number(/\bdepth (\d+)/.exec(line)?.[1]||0),pv:line.split(' pv ')[1]?.trim().split(/\s+/)||[],nodes,timeMs};
+        const rank=Number(/\bmultipv (\d+)/.exec(line)?.[1]||1);collect?.(rank,candidate);if(rank===1)evaluation=candidate;
       },'nodes' in limit?120000:20000);
       if(!evaluation)return yield* Effect.fail(new Error('Stockfish returned no evaluation.'));
-      if(this.compatible){const pvBoard=new Chess(board.fen());evaluation.pv=evaluation.pv.map(uci=>{const normal=standardMove(pvBoard,uci);pvBoard.move(normal);return normal;});}
-      return {...evaluation,nodes,timeMs};
+      return {...this.normalize(evaluation,board.fen()),nodes,timeMs};
     });
   }
   close(){if(!this.closed){this.closed=true;this.child.stdin.on('error',()=>{});this.child.kill();}}

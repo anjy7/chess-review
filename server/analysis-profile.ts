@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Scheduling adapted from fishnet (GPL-3.0-or-later); see ANALYSIS_PROFILE.md.
 import { Chess } from 'chess.js';
+import {DEFAULT_WORKERS,MAX_WORKERS,isWorkerCount} from '../src/analysis-settings.js';
 export const FISHNET_PROFILE={id:'fishnet-17d4d063-manual-v1',nominalNodes:1_000_000,nodes:Math.floor(1_000_000*6/7),threads:1,hashMb:16,multiPv:1,skill:20,chess960:true,
   fishnetRevision:'17d4d06359af8f6c25e432deca7f6cfe26d90177',lilaRevision:'eb024cbad43714392ecce64e8d716c63cd273d00',
   expectedEngineRevision:'edb0d9db6731067ec50ce619ff372b463bc4dd5d'} as const;
 export type SearchLimit={milliseconds:number}|{nodes:number};
-export function analysisOptions(body:{mode?:unknown;seconds?:unknown}) {
+export function analysisOptions(body:{mode?:unknown;seconds?:unknown;workers?:unknown}) {
   if(body.mode!==undefined&&body.mode!=='timed'&&body.mode!=='lichess')throw Error('Unknown analysis mode.');
-  if(body.mode==='lichess')return {mode:'lichess' as const,limit:{nodes:FISHNET_PROFILE.nodes}};
+  if(body.mode==='lichess'){
+    const workers=body.workers===undefined?DEFAULT_WORKERS:body.workers;
+    if(!isWorkerCount(workers))throw Error(`Choose 1–${MAX_WORKERS} analysis workers.`);
+    return {mode:'lichess' as const,limit:{nodes:FISHNET_PROFILE.nodes},workers};
+  }
   const seconds=Number(body.seconds??0.3);
   if(!Number.isFinite(seconds)||seconds<0.1||seconds>3)throw Error('Choose 0.1–3 seconds per position.');
   return {mode:'timed' as const,limit:{milliseconds:seconds*1000}};

@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { Effect, Cause, Exit } from 'effect';
 import { enginePath } from './engine.js';
 import { review } from './review.js';
+import { analyzeTree } from './tree.js';
 import { analyzePosition, positionInput } from './position.js';
 import { analysisOptions } from './analysis-profile.js';
 import { recentGames } from './recent-games.js';
@@ -23,7 +24,11 @@ app.use((req,res,next)=>{
 app.use(express.json({limit:'256kb'}));
 const jobs=new Map<string,Job>();
 let active:{id:string;controller:AbortController}|undefined;
-let liveController:AbortController|undefined;
+const liveControllers=new Set<AbortController>();
+const liveGate=Effect.runSync(Effect.makeSemaphore(1));
+// Queue tree searches rather than letting a late request cancel a newer popup.
+const treeControllers=new Set<AbortController>();
+const treeGate=Effect.runSync(Effect.makeSemaphore(1));
 app.get('/api/health',(_req,res)=>{try{res.json({available:existsSync(enginePath())});}catch{res.json({available:false});}});
 app.post('/api/import',async(req,res,next)=>{
   const controller=new AbortController();res.on('close',()=>controller.abort());
@@ -35,17 +40,27 @@ app.post('/api/recent-games',async(req,res,next)=>{
 });
 app.post('/api/position',async(req,res,next)=>{
   let controller:AbortController|undefined;
-  try{const input=positionInput(req.body);liveController?.abort();controller=new AbortController();liveController=controller;
+  try{const input=positionInput(req.body);controller=new AbortController();liveControllers.add(controller);
     res.on('close',()=>controller?.abort());
-    const result=await Effect.runPromise(analyzePosition(input),{signal:controller.signal});
+    const result=await Effect.runPromise(liveGate.withPermits(1)(analyzePosition(input)),{signal:controller.signal});
     if(!res.destroyed)res.json(result);
-  }catch(error){if(!res.destroyed){if(controller?.signal.aborted)res.status(409).json({error:'Position analysis superseded.'});else next(error);}}
-  finally{if(liveController===controller)liveController=undefined;}
+  }catch(error){if(!res.destroyed){if(controller?.signal.aborted)res.status(409).json({error:'Position analysis cancelled.'});else next(error);}}
+  finally{if(controller)liveControllers.delete(controller);}
+});
+app.post('/api/tree',async(req,res,next)=>{
+  if(active){res.status(409).json({error:'Finish or cancel the game review before exploring the tree.'});return;}
+  let controller:AbortController|undefined;
+  try{const input=positionInput(req.body);controller=new AbortController();treeControllers.add(controller);
+    res.on('close',()=>controller?.abort());
+    const result=await Effect.runPromise(treeGate.withPermits(1)(analyzeTree(input)),{signal:controller.signal});
+    if(!res.destroyed)res.json(result);
+  }catch(error){if(!res.destroyed){if(controller?.signal.aborted)res.status(409).json({error:'Tree search cancelled.'});else next(error);}}
+  finally{if(controller)treeControllers.delete(controller);}
 });
 app.post('/api/analyze',(req,res,next)=>{try{
   if(active){res.status(409).json({error:'Another review is running. Cancel it first.'});return;}
   const game=parseGame(req.body.pgn),options=analysisOptions(req.body);
-  enginePath();
+  enginePath();for(const controller of treeControllers)controller.abort();
   const id=randomUUID(),controller=new AbortController(),job:Job={id,status:'running',progress:0,results:[],summary:{},scoringVersion:SCORING_VERSION};
   if(jobs.size>=10)jobs.delete(jobs.keys().next().value!);
   jobs.set(id,job);active={id,controller};
@@ -64,5 +79,5 @@ app.use(express.static(resolve('dist')));
 app.get('/',(_req,res)=>{if(existsSync(resolve('dist/index.html')))res.sendFile(resolve('dist/index.html'));else res.status(503).send('Run npm run build first, or use the Vite development URL.');});
 app.use((error:Error, _req:express.Request,res:express.Response,_next:express.NextFunction)=>{res.status(400).json({error:error.message});});
 const server=app.listen(8765,'127.0.0.1',()=>console.log('Local Chess Review: http://127.0.0.1:8765'));
-const stop=()=>{active?.controller.abort();liveController?.abort();server.close();};
+const stop=()=>{active?.controller.abort();for(const controller of liveControllers)controller.abort();for(const controller of treeControllers)controller.abort();server.close();};
 process.on('SIGINT',stop);process.on('SIGTERM',stop);

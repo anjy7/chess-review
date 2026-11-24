@@ -12,22 +12,31 @@ function rowFor(game:Game,i:number,before:Evaluation,after:Evaluation):Row {
 }
 export function review(game:Game,options:ReturnType<typeof analysisOptions>,job:Job){
   return Effect.scoped(Effect.gen(function*(){
-    const engine=yield* acquireEngine;yield* engine.initialize(options.mode==='lichess');
     const initial=game.positions[0],moves=game.moves.map(m=>m.uci);
-    job.analysis={mode:options.mode,...options.limit,engine:engine.name,network:engine.network,
+    job.analysis={mode:options.mode,...options.limit,
       ...(options.mode==='lichess'?{profile:FISHNET_PROFILE.id,nominalNodes:FISHNET_PROFILE.nominalNodes}:{}),completedPositions:0,totalPositions:moves.length+1};
     if(options.mode==='lichess'){
       const evaluations:Evaluation[]=Array(moves.length+1);
-      for(const chunk of fishnetChunks(moves.length)){
-        yield* engine.newGame();
-        for(const position of chunk){
-          const evaluated=yield* engine.evaluate(initial,moves.slice(0,position.index),options.limit);
-          if(!position.warmup){evaluations[position.index]=evaluated;job.analysis.completedPositions!++;job.progress=job.analysis.completedPositions!/(moves.length+1);}
+      const chunks=fishnetChunks(moves.length),workers=Math.min(options.workers,chunks.length);
+      job.analysis.workers=options.workers;job.analysis.effectiveWorkers=workers;
+      let next=0;
+      // Each scoped engine owns its cache and processes one complete group at a time.
+      // Effect interrupts all siblings and releases their engines on failure/cancellation.
+      yield* Effect.forEach(Array.from({length:workers}),()=>Effect.scoped(Effect.gen(function*(){
+        const engine=yield* acquireEngine;yield* engine.initialize(true);
+        job.analysis!.engine=engine.name;job.analysis!.network=engine.network;
+        while(next<chunks.length){
+          const chunk=chunks[next++];yield* engine.newGame();
+          for(const position of chunk){
+            const evaluated=yield* engine.evaluate(initial,moves.slice(0,position.index),options.limit);
+            if(!position.warmup){evaluations[position.index]=evaluated;job.analysis!.completedPositions!++;job.progress=job.analysis!.completedPositions!/(moves.length+1);}
+          }
         }
-      }
+      })),{concurrency:'unbounded',discard:true});
       // Return chronological rows only once backwards analysis is complete; no sparse API arrays.
       job.results=game.moves.map((_,i)=>rowFor(game,i,evaluations[i],evaluations[i+1]));
     }else{
+      const engine=yield* acquireEngine;yield* engine.initialize(false);job.analysis.engine=engine.name;job.analysis.network=engine.network;
       let before=yield* engine.evaluate(initial,[],options.limit);job.analysis.completedPositions=1;
       for(let i=0;i<moves.length;i++){
         const after=yield* engine.evaluate(initial,moves.slice(0,i+1),options.limit);

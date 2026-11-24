@@ -6,9 +6,11 @@ import { fishnetChunks, analysisOptions, engineMove, standardMove, FISHNET_PROFI
 import { acquireEngine } from '../server/engine.js';
 
 test('compatibility profile ignores timed input; invalid modes/budgets rejected',()=>{
- assert.deepEqual(analysisOptions({mode:'lichess',seconds:0.1}),{mode:'lichess',limit:{nodes:857142}});
+ assert.deepEqual(analysisOptions({mode:'lichess',seconds:0.1}),{mode:'lichess',limit:{nodes:857142},workers:16});
  assert.deepEqual(analysisOptions({seconds:.3}),{mode:'timed',limit:{milliseconds:300}});
  assert.throws(()=>analysisOptions({mode:'fake'}));for(const seconds of [NaN,Infinity,0,4])assert.throws(()=>analysisOptions({seconds}));
+ for(const workers of [0,33,1.5,NaN,Infinity,'4',null])assert.throws(()=>analysisOptions({mode:'lichess',workers}));
+ for(const workers of [1,4,8,10,16,17,32])assert.equal(analysisOptions({mode:'lichess',workers}).workers,workers);
  assert.equal(FISHNET_PROFILE.hashMb,16);assert.equal(FISHNET_PROFILE.threads,1);
 });
 test('reverse chunks cover initial through final exactly once plus warmups',()=>{
