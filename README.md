@@ -39,13 +39,31 @@ The engine setup script installs Stockfish 19 on Windows. For an existing instal
 
 Use **← / →** to step through moves. **Save review** stores the review in your browser and downloads a JSON copy.
 
-## How it works
+## Analysis modes
 
-- **Engine analysis:** Stockfish 19 searches possible continuations and scores positions with its NNUE neural-network evaluator. Analysis uses either a fixed node budget or a time limit per position.
-- **Move accuracy:** Lichess-derived formulas convert evaluations into winning chances, then turn the drop after each move into a 0–100 accuracy score using an exponential curve.
-- **Game accuracy:** Each player's score averages a volatility-weighted mean and a harmonic mean of move accuracies, emphasizing changing positions and costly mistakes.
-- **Move labels:** Winning-chance drops of roughly 5, 10, and 15 percentage points mark inaccuracies, mistakes, and blunders, with separate rules for forced-mate transitions. Other moves are labeled Best when they match the engine's recommendation, or Good otherwise.
-- **Openings:** Board positions are matched against a local opening database to identify names and ECO codes, including transpositions. Recorded opening transitions receive Book labels while retaining their accuracy scores.
+Every mode uses Stockfish 19 to evaluate positions and find the strongest continuation. Choose a mode in Settings before analyzing a game.
+
+| Mode | Search budget | Best for |
+| --- | --- | --- |
+| **Lichess-compatible** (default) | 1M nominal nodes per position | Consistent search effort using a Lichess fishnet-style profile. |
+| **Quick** | 0.1 seconds per position | A fast overview of the game. |
+| **Standard** | 0.3 seconds per position | Everyday reviews with a balance of speed and search time. |
+| **Deep** | 1 second per position | Giving Stockfish more time to investigate tactics and alternatives. |
+| **Thorough** | 3 seconds per position | The longest timed search for a detailed review. |
+
+### Fixed-node analysis
+
+Lichess-compatible mode limits search work rather than elapsed time. A node is a position visited during the search. It works backward through the game in groups, with warm-up searches and a cleared engine cache between groups. The nominal 1M budget becomes **857,142 nodes per search** after fishnet's overlap adjustment. It uses **one CPU thread and 16 MB of hash memory**; completion time depends on your CPU.
+
+### Timed analysis
+
+Quick, Standard, Deep, and Thorough analyze positions from start to finish, showing results progressively. Each position gets the selected time allowance, using **up to four CPU threads and 128 MB of hash memory**. Longer searches let Stockfish explore more possibilities; the depth reached depends on the position and hardware.
+
+### Live analysis
+
+Exploring a variation or opening the Analysis tab triggers a fresh **0.6-second search** for the current position. Moving again replaces the previous request, keeping recommendations focused on the position you're viewing.
+
+All full-game modes use the same Lichess-derived accuracy scoring; the search budget determines the evaluations fed into it.
 
 ## Development
 
