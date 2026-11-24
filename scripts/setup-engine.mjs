@@ -1,0 +1,25 @@
+import { mkdir, writeFile, readdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+if(process.platform!=='win32')throw Error('Automatic setup currently supports Windows. Install Stockfish 19 and set STOCKFISH_PATH on other platforms.');
+const response=await fetch('https://api.github.com/repos/official-stockfish/Stockfish/releases/tags/sf_19');
+if(!response.ok)throw Error(`GitHub: ${response.status}`);
+const release=await response.json();
+const arch=process.arch==='arm64'?'arm64':'x86-64';
+const asset=release.assets.find(a=>a.name===`stockfish-windows-${arch}-universal.zip`);
+if(!asset)throw Error('Official Windows Stockfish 19 asset not found.');
+console.log('Downloading',asset.name);
+const download=await fetch(asset.browser_download_url);
+if(!download.ok)throw Error(`Download: ${download.status}`);
+const bytes=Buffer.from(await download.arrayBuffer());
+if(!asset.digest?.startsWith('sha256:'))throw Error('Release has no SHA-256 digest; verify and install manually.');
+if('sha256:'+createHash('sha256').update(bytes).digest('hex')!==asset.digest)throw Error('Stockfish checksum mismatch.');
+await mkdir('engines',{recursive:true});
+const archive=resolve('engines/stockfish-19.zip'),destination=resolve('engines/stockfish-19');
+await writeFile(archive,bytes);
+execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',`Expand-Archive -LiteralPath '${archive.replaceAll("'","''")}' -DestinationPath '${destination.replaceAll("'","''")}' -Force`],{stdio:'inherit'});
+async function scan(dir){for(const e of await readdir(dir,{withFileTypes:true})){const p=resolve(dir,e.name);if(e.isDirectory()){const found=await scan(p);if(found)return found;}else if(/^stockfish.*\.exe$/.test(e.name))return p;}}
+const binary=await scan(destination);if(!binary)throw Error('No executable found.');
+console.log(execFileSync(binary,[],{input:'uci\nquit\n',encoding:'utf8',timeout:20000}));
+console.log('Verified SHA-256 and extracted Stockfish 19. Its license and source references are retained in engines/.');

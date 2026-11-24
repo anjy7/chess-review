@@ -1,0 +1,11 @@
+node_modules/
+dist/
+engines/
+.scratch/
+.env
+.env.*
+!.env.example
+*.log
+# Private screenshot crops and their local extraction helper are not distributed.
+public/reference/
+scripts/reference-assets.py
